@@ -55,35 +55,34 @@ public class BlogService {
     // 요구사항 2) 게시글 작성
     @Transactional
     public ResponseEntity<Object> createBlog(BlogRequestDto blogrequestDto, HttpServletRequest request) {
-        // Request에서 Token 가져오기
+        // 1) Request에서 Token 가져오기
         String token = jwtUtil.resolveToken(request);
-        // token 의 정보를 임시로 저장하는 곳.
+        Claims claims; // token 의 정보를 임시로 저장하는 곳.
 
-        Claims claims;
-
-        // 토큰이 있는 경우에만 관심상품 추가 가능
+        // 2) 토큰이 있는 경우에만 게시글 추가 가능.
         if (token != null) {
+            // 2-1) 토큰이 휴효한 토큰인지 판별
             if (jwtUtil.validateToken(token)) {
-                // 토큰에서 사용자 정보 가져오기
-                claims = jwtUtil.getUserInfoFromToken(token);
+                claims = jwtUtil.getUserInfoFromToken(token); // 토큰에서 사용자 정보 가져오기
             } else {
                 throw new IllegalArgumentException("유효한 토큰이 아닙니다.");
             }
 
-            // 토큰에서 가져온 사용자 정보를 사용하여 DB 조회
+            // 2-2) 토큰에서 가져온 사용자 정보를 사용하여 DB 조회 및 유무판단.
             User user = userRepository.findByUsername(claims.getSubject()).orElseThrow(
                     () -> new IllegalArgumentException("사용자가 존재하지 않습니다.")
             );
 
-            // 요청받은 DTO 로 DB에 저장할 객체 만들기
+            // 3) 요청받은 DTO 로 DB에 저장할 객체 만들기
             Blog blog = blogRepository.saveAndFlush(Blog.builder()
                     .blogRequestDto(blogrequestDto)
                     .user(user)
                     .build());
 
+            // 4) ResponseEntity에 Body 부분에 만든 객체 전달.
             return ResponseEntity.ok()
                     .body(new BlogResponseDto(blog));
-        } else {
+        } else { // 토큰이 없는 경우.
             return ResponseEntity.badRequest()
                     .body(MessageResponseDto.builder()
                             .statusCode(HttpStatus.BAD_REQUEST.value())
@@ -96,13 +95,16 @@ public class BlogService {
     // 요구사항 3)  선택한 게시글 조회
     @Transactional(readOnly = true)
     public ResponseEntity<Object> getBlogs(Long id) {
+        // 1) id 를 사용하여 DB 조회 및 유무 판단.
         Blog blog = blogRepository.findById(id).orElseThrow(
                 () -> new IllegalArgumentException("해당글이 없습니다.")
         );
+        // 2) 가져온 blog 에 Comment들을 CommentList 에 추가.
         List<CommentResponseDto> commentList = new ArrayList<>();
         for(Comment comment: blog.getComments()){
             commentList.add(new CommentResponseDto(comment));
         }
+        // 3) ResponseEntity에 Body 부분에 만든 객체 전달.
         return ResponseEntity.ok()
                 .body(new BlogResponseDto(blog,commentList));
     }
@@ -110,40 +112,43 @@ public class BlogService {
     // 요구사항4. 선택한 게시글 수정
     @Transactional
     public ResponseEntity<Object> updateBlog(Long id, BlogRequestDto blogRequestDto, HttpServletRequest request) {
-        // Request에서 Token 가져오기
+        // 1) Request에서 Token 가져오기
         String token = jwtUtil.resolveToken(request);
         Claims claims;
 
-        // 토큰이 있는 경우에만 관심상품 최저가 업데이트 가능
+        // 2) 토큰이 있는 경우에만 게시글 수정 가능.
         if (token != null) {
-            // Token 검증
+            // 2-1) 토큰이 휴효한 토큰인지 판별.
             if (jwtUtil.validateToken(token)) {
-                // 토큰에서 사용자 정보 가져오기
-                claims = jwtUtil.getUserInfoFromToken(token);
+                claims = jwtUtil.getUserInfoFromToken(token); // 토큰에서 사용자 정보 가져오기.
             } else {
                 throw new IllegalArgumentException("유효한 토큰이 아닙니다.");
             }
 
-            // 토큰에서 가져온 사용자 정보를 사용하여 DB 조회
+            // 2-2) 토큰에서 가져온 사용자 정보를 사용하여 userRepoDB 조회 및 유무판단.
             Optional <User> user = userRepository.findByUsername(claims.getSubject());
             if (user.isEmpty()) {
                 return responseException("사용자가 존재하지 않습니다.");
             }
-
+            // 2-2) id 와 user를 사용하여 blogRepoDB 조회 및 유무판단.
             Optional<Blog> blog = blogRepository.findByIdAndUser(id, user.get());
             if (blog.isEmpty()) { // 일치하는 게시물이 없다면
                 return responseException("본인이 작성한 게시글만 수정이 가능합니다.");
             }
 
+            // 3) blogRepo DB update
             blog.get().update(blogRequestDto, user.get());
 
+            // 4) 가져온 blog 에 Comment들을 CommentList 에 추가.
             List<CommentResponseDto> commentList = new ArrayList<>();
             for(Comment comment: blog.get().getComments()){
                 commentList.add(new CommentResponseDto(comment));
             }
+
+            // 5) ResponseEntity에 Body 부분에 만든 객체 전달.
             return ResponseEntity.ok()
                     .body(new BlogResponseDto(blog.get(),commentList));
-        } else {
+        } else { // 토큰이 존재하지 않을 경우.
             return ResponseEntity.badRequest()
                     .body(MessageResponseDto.builder()
                             .statusCode(HttpStatus.BAD_REQUEST.value())
@@ -156,36 +161,37 @@ public class BlogService {
     @Transactional
     public ResponseEntity<Object> deleteBlog(Long id, HttpServletRequest request) {
 
-        // Request에서 Token 가져오기
+        // 1) Request에서 Token 가져오기
         String token = jwtUtil.resolveToken(request);
         Claims claims;
-        // 토큰이 있는 경우에만 관심상품 최저가 업데이트 가능
+        // 2) 토큰이 있는 경우에만 선택한 게시글 삭제 가능.
         if (token != null) {
-            // Token 검증
+            // 2-1) 토큰이 휴효한 토큰인지 판별.
             if (jwtUtil.validateToken(token)) {
-                // 토큰에서 사용자 정보 가져오기
-                claims = jwtUtil.getUserInfoFromToken(token);
+                claims = jwtUtil.getUserInfoFromToken(token); // 토큰에서 사용자 정보 가져오기
             } else {
                 throw new IllegalArgumentException("유효한 토큰이 아닙니다.");
             }
-
-            // 토큰에서 가져온 사용자 정보를 사용하여 DB 조회
+            //  2-2) 토큰에서 가져온 사용자 정보를 사용하여 DB 조회 및 유무 판단.
             User user = userRepository.findByUsername(claims.getSubject()).orElseThrow(
                     () -> new IllegalArgumentException("사용자가 존재하지 않습니다.")
             );
-
+            //  2-3) id 와 user를 사용하여 DB 조회 및 유무 판단.
             Blog blog = blogRepository.findByIdAndUser(id, user).orElseThrow(
                     () -> new NullPointerException("본인이 작성한 게시글이 아닙니다.")
             );
 
+            // 3) id를 통해서 DB 삭제.
             blogRepository.deleteById(id);
+
+            // 4) ResponseEntity에 Body 부분에 만든 객체 전달.
             return ResponseEntity.ok()
                     .body(MessageResponseDto.builder()
                             .statusCode(HttpStatus.OK.value())
                             .msg("게시글 삭제 성공.")
                             .build()
                     );
-        } else {
+        } else { // 토큰이 존재하지 않는 경우.
             return ResponseEntity.badRequest()
                     .body(MessageResponseDto.builder()
                             .statusCode(HttpStatus.BAD_REQUEST.value())
@@ -195,6 +201,7 @@ public class BlogService {
 
     }
 
+    // 에러메세지 출력하는 메서드
     private static ResponseEntity<Object> responseException(String message) {
         return ResponseEntity.badRequest()
                 .body(MessageResponseDto.builder()

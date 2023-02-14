@@ -34,20 +34,18 @@ public class CommentService {
     // 요구사항 1) 댓글 작성
     @Transactional
     public ResponseEntity<Object> createComment(Long id, CommentRequestDto commentRequestDto, HttpServletRequest request) {
-        // Request에서 Token 가져오기
+        // 1) Request에서 Token 가져오기
         String token = jwtUtil.resolveToken(request);
-        // token 의 정보를 임시로 저장하는 곳.
-        Claims claims;
+        Claims claims;  // token 의 정보를 임시로 저장하는 곳.
 
         // 2) 토큰을 검사하여, 유효한 토큰일 경우에만 댓글 작성 가능
         if (token != null) {
             if (jwtUtil.validateToken(token)) {
-                // 토큰에서 사용자 정보 가져오기
-                claims = jwtUtil.getUserInfoFromToken(token);
+                claims = jwtUtil.getUserInfoFromToken(token); // 토큰에서 사용자 정보 가져오기
             } else {
-                throw new IllegalArgumentException("유효한 토큰이 아닙니다.");
+                return responseException("유효한 토큰이 아닙니다.");
             }
-            // 3) 토큰존재 + 유효한 토큰 -> 게시글이 존재하는지 확인.
+            // 3) id 와 user를 사용하여 blogRepoDB 조회 및 유무판단.
             Optional<Blog> blog = blogRepository.findById(id);
             if (blog.isEmpty()) {
                 return responseException("게시글이 존재하지 않습니다.");
@@ -66,6 +64,7 @@ public class CommentService {
                     .blog(blog.get())
                     .build());
 
+            // 6) ResponseEntity에 Body 부분에 만든 객체 전달.
             return ResponseEntity.ok()
                     .body(new CommentResponseDto(comment));
         } else {
@@ -80,48 +79,48 @@ public class CommentService {
     // 요구사항 2) 댓글 수정
     @Transactional
     public ResponseEntity<Object> updateComment(Long id, CommentRequestDto commentRequestDto, HttpServletRequest request) {
-        // Request에서 Token 가져오기
+        // 1) Request에서 Token 가져오기
         String token = jwtUtil.resolveToken(request);
         Claims claims;
 
         // 2) 토큰이 존재하는 경우 댓글 수정 가능.
         if (token != null) {
-            // Token 검증
+            // 2-1) 토큰이 휴효한 토큰인지 판별.
             if (jwtUtil.validateToken(token)) {
-                // 토큰에서 사용자 정보 가져오기
-                claims = jwtUtil.getUserInfoFromToken(token);
+                claims = jwtUtil.getUserInfoFromToken(token);   // 토큰에서 사용자 정보 가져오기
             } else {
                 throw new IllegalArgumentException("유효한 토큰이 아닙니다.");
             }
-
 //            Optional<Blog> blog = blogRepository.findById(blogId);
 //            if (blog.isEmpty()) {
 //                return responseException("게시글이 존재하지 않습니다.");
 //            }
-            // 토큰에서 가져온 사용자 정보를 사용하여 DB 조회
+            // 2-2) 토큰에서 가져온 사용자 정보를 사용하여 DB 조회 및 유무 판단.
             Optional<User> user = userRepository.findByUsername(claims.getSubject());
             if (user.isEmpty()) {
                 return responseException("사용자가 존재하지 않습니다.");
             }
-            // 3) Admin 권한이 있는 친구는 전부 수정.
+
+            // 3) Admin 권한이 있는 친구는 전부 수정, 아닌경우 일부수정.
             UserRoleEnum userRoleEnum = user.get().getRole();
             Optional<Comment> comment;
-
+            // 3-1) Admin 권환인 경우.
             if (userRoleEnum == UserRoleEnum.ADMIN) {
                 comment = commentRepository.findById(id);
                 if (comment.isEmpty()) { // 일치하는 댓글이 없다면
                     return responseException("댓글이 존재하지 않습니다.");
                 }
 
-            } else {
+            } else { // 3-2) User 권한인 경우.
                 comment = commentRepository.findByIdAndUser(id, user.get());
                 if (comment.isEmpty()) { // 일치하는 댓글이 없다면
                     return responseException("댓글이 존재하지 않습니다.");
                 }
             }
-
+            // 4) Comment Update
             comment.get().update(commentRequestDto, user.get());
 
+            // 5) ResponseEntity에 Body 부분에 만든 객체 전달.
             return ResponseEntity.ok()
                     .body(new CommentResponseDto(comment.get()));
         } else {
@@ -137,51 +136,54 @@ public class CommentService {
     // 요구사항 3) 댓글 삭제
     @Transactional
     public ResponseEntity<Object> deleteComment(Long id, HttpServletRequest request) {
-        // Request에서 Token 가져오기
+        // 1) Request에서 Token 가져오기
         String token = jwtUtil.resolveToken(request);
         Claims claims;
 
-        // 토큰이 있는 경우에만 관심상품 최저가 업데이트 가능
+        // 2) 토큰이 있는 경우에만 선택한 댓글 삭제 가능.
         if (token != null) {
-            // Token 검증
+            //  2-1) 토큰이 휴효한 토큰인지 판별.
             if (jwtUtil.validateToken(token)) {
-                // 토큰에서 사용자 정보 가져오기
-                claims = jwtUtil.getUserInfoFromToken(token);
+                claims = jwtUtil.getUserInfoFromToken(token); // 토큰에서 사용자 정보 가져오기
 
             } else {
                 throw new IllegalArgumentException("유효한 토큰이 아닙니다.");
             }
 
-            // 토큰에서 가져온 사용자 정보를 사용하여 DB 조회
+            //  2-2) 토큰에서 가져온 사용자 정보를 사용하여 DB 조회 및 유무 판단.
             Optional<User> user = userRepository.findByUsername(claims.getSubject());
             if (user.isEmpty()) {
                 return responseException("사용자가 존재하지 않습니다.");
             }
-
+            // 3) Admin 권한이 있는 친구는 전부 수정, 아닌경우 일부수정.
             UserRoleEnum userRoleEnum = user.get().getRole();
             Optional<Comment> comment;
 
+            // 3-1) Admin 권환인 경우.
             if (userRoleEnum == UserRoleEnum.ADMIN) {
                 comment = commentRepository.findById(id);
                 if (comment.isEmpty()) { // 일치하는 댓글이 없다면
                     return responseException("댓글이 존재하지 않습니다.");
                 }
 
-            } else {
+            } else {    // 3-2) User 권한인 경우.
                 comment = commentRepository.findByIdAndUser(id, user.get());
                 if (comment.isEmpty()) { // 일치하는 댓글이 없다면
                     return responseException("댓글이 존재하지 않습니다.");
                 }
             }
 
+            // 4) Comment Delete
             commentRepository.deleteById(id);
+
+            // 5) ResponseEntity에 Body 부분에 만든 객체 전달.
             return ResponseEntity.ok()
                     .body(MessageResponseDto.builder()
                             .statusCode(HttpStatus.OK.value())
                             .msg("댓글 삭제 성공.")
                             .build()
                     );
-        } else {
+        } else { // 토큰이 없는 경우
             return ResponseEntity.badRequest()
                     .body(MessageResponseDto.builder()
                             .statusCode(HttpStatus.BAD_REQUEST.value())

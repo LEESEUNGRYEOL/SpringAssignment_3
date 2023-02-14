@@ -13,22 +13,22 @@ import javax.servlet.http.HttpServletRequest;
 @RequiredArgsConstructor
 @RequestMapping("/api")
 public class CommentController {
-    // 1) CommentService 의존성 주입.
+    // 0) DI
     private final CommentService commentService;
 
-    // 2) 댓글 작성 API (POST)
+    // 요구사항1) 댓글 작성 API (POST)
     @PostMapping("/comment/{id}")
     public ResponseEntity<Object> createComment(@PathVariable Long id, @RequestBody CommentRequestDto commentRequestDto, HttpServletRequest request) {
         return commentService.createComment(id, commentRequestDto, request);
     }
 
-    // 3) 댓글 수정 API (PUT)
+    // 요구사항2) 댓글 수정 API (PUT)
     @PutMapping("/comment/{id}")
     public ResponseEntity<Object> updateComment(@PathVariable Long id, @RequestBody CommentRequestDto commentRequestDto, HttpServletRequest request) {
         return commentService.updateComment(id, commentRequestDto, request);
     }
 
-    // 4) 댓글 삭제 API (DEL)
+    // 요구사항3) 댓글 삭제 API (DEL)
     @DeleteMapping("/comment/{id}")
     public ResponseEntity<Object> deleteComment(@PathVariable Long id, HttpServletRequest request) {
         return commentService.deleteComment(id, request);

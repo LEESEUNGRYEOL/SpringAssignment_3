@@ -23,14 +23,14 @@ public class UserController {
     // DI 주입
     private final UserService userService;
 
-    // 요구사항1. 회원 가입
+    // 요구사항1) 회원 가입
     @PostMapping("/signup")
     public ResponseEntity<MessageResponseDto> signup(@RequestBody @Valid SignupRequestDto signupRequestDto, BindingResult bindingResult) {
         return userService.signup(signupRequestDto,bindingResult);
     }
 
 
-    // 요구사항2. 로그인
+    // 요구사항2) 로그인
     @PostMapping("/login")
     public ResponseEntity<MessageResponseDto> login(@RequestBody LoginRequestDto loginRequestDto) {
         return userService.login(loginRequestDto);
