@@ -2,6 +2,8 @@ package com.example.mybloguserfinal.controller;
 
 import com.example.mybloguserfinal.dto.AllResponseDto;
 import com.example.mybloguserfinal.dto.BlogRequestDto;
+import com.example.mybloguserfinal.dto.BlogResponseDto;
+import com.example.mybloguserfinal.dto.MessageResponseDto;
 import com.example.mybloguserfinal.service.BlogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -28,26 +30,26 @@ public class BlogController {
 
     // 요구사항2) 게시글 작성 API (POST)
     @PostMapping("/blogs")
-    public ResponseEntity<Object> createBlog(@RequestBody BlogRequestDto blogrequestDto, HttpServletRequest request) {
+    public ResponseEntity<BlogResponseDto> createBlog(@RequestBody BlogRequestDto blogrequestDto, HttpServletRequest request) {
         return blogService.createBlog(blogrequestDto, request);
     }
 
     // 요구사항3) 선택한 게시글 조회 API (GET)
     @GetMapping("/blogs/{id}")
-    public ResponseEntity<Object> getBlogs(@PathVariable Long id) {
+    public ResponseEntity<BlogResponseDto> getBlogs(@PathVariable Long id) {
         return blogService.getBlogs(id);
     }
 
 
     // 요구사항4) 선택한 게시글 수정 API (PUT)
     @PutMapping("/blogs/{id}")
-    public ResponseEntity<Object> updateBlog(@PathVariable Long id, @RequestBody BlogRequestDto blogRequestDto, HttpServletRequest request) {
+    public ResponseEntity<BlogResponseDto> updateBlog(@PathVariable Long id, @RequestBody BlogRequestDto blogRequestDto, HttpServletRequest request) {
         return blogService.updateBlog(id, blogRequestDto, request);
     }
 
     // 요구사항5) 선택한 게시글 삭제 API (DEL)
     @DeleteMapping("/blogs/{id}")
-    public ResponseEntity<Object> deleteBlog(@PathVariable Long id, HttpServletRequest request) {
+    public ResponseEntity<MessageResponseDto> deleteBlog(@PathVariable Long id, HttpServletRequest request) {
         return blogService.deleteBlog(id, request);
     }
 }

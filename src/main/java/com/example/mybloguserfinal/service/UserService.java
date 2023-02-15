@@ -7,6 +7,7 @@ import com.example.mybloguserfinal.entity.User;
 import com.example.mybloguserfinal.entity.UserRoleEnum;
 import com.example.mybloguserfinal.jwt.JwtUtil;
 import com.example.mybloguserfinal.repository.UserRepository;
+import com.example.mybloguserfinal.util.CustomException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -16,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.BindingResult;
 
 import java.util.Optional;
+
+import static com.example.mybloguserfinal.util.ErrorCode.*;
 
 @Service
 @RequiredArgsConstructor
@@ -46,22 +49,14 @@ public class UserService {
         // 3) 회원 중복 확인
         Optional<User> found = userRepository.findByUsername(username);
         if (found.isPresent()) {
-            return ResponseEntity.badRequest()
-                    .body(MessageResponseDto.builder()
-                            .statusCode(HttpStatus.BAD_REQUEST.value())
-                            .msg("중복된 사용자가 존재합니다.")
-                            .build());
+            throw new CustomException(DUPLICATE_USER);
         }
 
         // 4) 사용자 ROLE 확인
         UserRoleEnum role = UserRoleEnum.USER;
         if (signupRequestDto.isAdmin()) {
             if (!signupRequestDto.getAdminToken().equals(ADMIN_TOKEN)) {
-                return ResponseEntity.badRequest()
-                        .body(MessageResponseDto.builder()
-                                .statusCode(HttpStatus.BAD_REQUEST.value())
-                                .msg("관리자 토큰값이 아닙니다.")
-                                .build());
+                throw new CustomException(INVALID_ADMIN_TOKEN);
             }
             role = UserRoleEnum.ADMIN;
         }
@@ -94,20 +89,12 @@ public class UserService {
         // 2) 가져온 Username 을 통해서 Db에 있는 username 과 비교해 사용자가 존재하는지 확인.
         Optional<User> user = userRepository.findByUsername(username);
         if (user.isEmpty()) {
-            return ResponseEntity.badRequest()
-                    .body(MessageResponseDto.builder()
-                            .statusCode(HttpStatus.BAD_REQUEST.value())
-                            .msg("등록된 사용자가 없습니다.")
-                            .build());
+            throw new CustomException(NOT_FOUND_USER);
         }
 
         // 3) 비밀번호가 Client 에게 받은 비밀번호와 일치하는지 확인.
         if (!user.get().getPassword().equals(password)) {
-            return ResponseEntity.badRequest()
-                    .body(MessageResponseDto.builder()
-                            .statusCode(HttpStatus.BAD_REQUEST.value())
-                            .msg("비밀번호가 일치하지 않습니다.")
-                            .build());
+            throw new CustomException(NOT_MATCH_PASSWORD);
         }
 
         // 4) header 에 들어갈 JWT 설정함.

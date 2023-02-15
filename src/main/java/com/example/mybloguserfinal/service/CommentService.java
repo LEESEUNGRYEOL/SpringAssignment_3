@@ -11,6 +11,7 @@ import com.example.mybloguserfinal.jwt.JwtUtil;
 import com.example.mybloguserfinal.repository.BlogRepository;
 import com.example.mybloguserfinal.repository.CommentRepository;
 import com.example.mybloguserfinal.repository.UserRepository;
+import com.example.mybloguserfinal.util.CustomException;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.Optional;
+
+import static com.example.mybloguserfinal.util.ErrorCode.*;
 
 
 @Service
@@ -33,7 +36,7 @@ public class CommentService {
 
     // 요구사항 1) 댓글 작성
     @Transactional
-    public ResponseEntity<Object> createComment(Long id, CommentRequestDto commentRequestDto, HttpServletRequest request) {
+    public ResponseEntity<CommentResponseDto> createComment(Long id, CommentRequestDto commentRequestDto, HttpServletRequest request) {
         // 1) Request에서 Token 가져오기
         String token = jwtUtil.resolveToken(request);
         Claims claims;  // token 의 정보를 임시로 저장하는 곳.
@@ -43,18 +46,18 @@ public class CommentService {
             if (jwtUtil.validateToken(token)) {
                 claims = jwtUtil.getUserInfoFromToken(token); // 토큰에서 사용자 정보 가져오기
             } else {
-                return responseException("유효한 토큰이 아닙니다.");
+                throw new CustomException(INVALID_TOKEN);
             }
             // 3) id 와 user를 사용하여 blogRepoDB 조회 및 유무판단.
             Optional<Blog> blog = blogRepository.findById(id);
             if (blog.isEmpty()) {
-                return responseException("게시글이 존재하지 않습니다.");
+                throw new CustomException(NOT_FOUND_BLOG);
             }
 
             // 4) 토큰에서 가져온 사용자 정보를 사용하여 DB 조회 -> user 엔티티 get
             Optional<User> user = userRepository.findByUsername(claims.getSubject());
             if (user.isEmpty()) {
-                return responseException("사용자가 존재하지 않습니다.");
+                throw new CustomException(NOT_FOUND_USER);
             }
 
             // 5) 요청받은 DTO 로 DB에 저장할 객체 만들기
@@ -68,17 +71,13 @@ public class CommentService {
             return ResponseEntity.ok()
                     .body(new CommentResponseDto(comment));
         } else {
-            return ResponseEntity.badRequest()
-                    .body(MessageResponseDto.builder()
-                            .statusCode(HttpStatus.BAD_REQUEST.value())
-                            .msg("토큰이 존재하지 않습니다.")
-                            .build());
+            throw new CustomException(NOT_FOUND_TOKEN);
         }
     }
 
     // 요구사항 2) 댓글 수정
     @Transactional
-    public ResponseEntity<Object> updateComment(Long id, CommentRequestDto commentRequestDto, HttpServletRequest request) {
+    public ResponseEntity<CommentResponseDto> updateComment(Long id, CommentRequestDto commentRequestDto, HttpServletRequest request) {
         // 1) Request에서 Token 가져오기
         String token = jwtUtil.resolveToken(request);
         Claims claims;
@@ -89,7 +88,7 @@ public class CommentService {
             if (jwtUtil.validateToken(token)) {
                 claims = jwtUtil.getUserInfoFromToken(token);   // 토큰에서 사용자 정보 가져오기
             } else {
-                throw new IllegalArgumentException("유효한 토큰이 아닙니다.");
+                throw new CustomException(INVALID_TOKEN);
             }
 //            Optional<Blog> blog = blogRepository.findById(blogId);
 //            if (blog.isEmpty()) {
@@ -98,7 +97,7 @@ public class CommentService {
             // 2-2) 토큰에서 가져온 사용자 정보를 사용하여 DB 조회 및 유무 판단.
             Optional<User> user = userRepository.findByUsername(claims.getSubject());
             if (user.isEmpty()) {
-                return responseException("사용자가 존재하지 않습니다.");
+                throw new CustomException(NOT_FOUND_USER);
             }
 
             // 3) Admin 권한이 있는 친구는 전부 수정, 아닌경우 일부수정.
@@ -108,13 +107,13 @@ public class CommentService {
             if (userRoleEnum == UserRoleEnum.ADMIN) {
                 comment = commentRepository.findById(id);
                 if (comment.isEmpty()) { // 일치하는 댓글이 없다면
-                    return responseException("댓글이 존재하지 않습니다.");
+                    throw new CustomException(NOT_FOUND_COMMENT);
                 }
 
             } else { // 3-2) User 권한인 경우.
                 comment = commentRepository.findByIdAndUser(id, user.get());
                 if (comment.isEmpty()) { // 일치하는 댓글이 없다면
-                    return responseException("댓글이 존재하지 않습니다.");
+                    throw new CustomException(NOT_FOUND_COMMENT);
                 }
             }
             // 4) Comment Update
@@ -124,18 +123,14 @@ public class CommentService {
             return ResponseEntity.ok()
                     .body(new CommentResponseDto(comment.get()));
         } else {
-            return ResponseEntity.badRequest()
-                    .body(MessageResponseDto.builder()
-                            .statusCode(HttpStatus.BAD_REQUEST.value())
-                            .msg("토큰이 존재하지 않습니다.")
-                            .build());
+            throw new CustomException(NOT_FOUND_TOKEN);
         }
 
     }
 
     // 요구사항 3) 댓글 삭제
     @Transactional
-    public ResponseEntity<Object> deleteComment(Long id, HttpServletRequest request) {
+    public ResponseEntity<MessageResponseDto> deleteComment(Long id, HttpServletRequest request) {
         // 1) Request에서 Token 가져오기
         String token = jwtUtil.resolveToken(request);
         Claims claims;
@@ -147,13 +142,13 @@ public class CommentService {
                 claims = jwtUtil.getUserInfoFromToken(token); // 토큰에서 사용자 정보 가져오기
 
             } else {
-                throw new IllegalArgumentException("유효한 토큰이 아닙니다.");
+                throw new CustomException(INVALID_TOKEN);
             }
 
             //  2-2) 토큰에서 가져온 사용자 정보를 사용하여 DB 조회 및 유무 판단.
             Optional<User> user = userRepository.findByUsername(claims.getSubject());
             if (user.isEmpty()) {
-                return responseException("사용자가 존재하지 않습니다.");
+                throw new CustomException(NOT_FOUND_USER);
             }
             // 3) Admin 권한이 있는 친구는 전부 수정, 아닌경우 일부수정.
             UserRoleEnum userRoleEnum = user.get().getRole();
@@ -163,13 +158,13 @@ public class CommentService {
             if (userRoleEnum == UserRoleEnum.ADMIN) {
                 comment = commentRepository.findById(id);
                 if (comment.isEmpty()) { // 일치하는 댓글이 없다면
-                    return responseException("댓글이 존재하지 않습니다.");
+                    throw new CustomException(NOT_FOUND_COMMENT);
                 }
 
             } else {    // 3-2) User 권한인 경우.
                 comment = commentRepository.findByIdAndUser(id, user.get());
                 if (comment.isEmpty()) { // 일치하는 댓글이 없다면
-                    return responseException("댓글이 존재하지 않습니다.");
+                    throw new CustomException(NOT_FOUND_COMMENT);
                 }
             }
 
@@ -184,21 +179,8 @@ public class CommentService {
                             .build()
                     );
         } else { // 토큰이 없는 경우
-            return ResponseEntity.badRequest()
-                    .body(MessageResponseDto.builder()
-                            .statusCode(HttpStatus.BAD_REQUEST.value())
-                            .msg("토큰이 존재하지 않습니다.")
-                            .build());
+            throw new CustomException(NOT_FOUND_TOKEN);
         }
-    }
-
-    // 에러메세지 출력하는 메서드
-    private static ResponseEntity<Object> responseException(String message) {
-        return ResponseEntity.badRequest()
-                .body(MessageResponseDto.builder()
-                        .statusCode(HttpStatus.BAD_REQUEST.value())
-                        .msg(message)
-                        .build());
     }
 
 }
