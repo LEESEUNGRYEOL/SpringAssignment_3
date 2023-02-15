@@ -1,6 +1,8 @@
 # SpringAssignment_3
 
 스프링 2주차 개인과제 (LEVEL 3)
+## ERD
+<img width="841" alt="image" src="https://user-images.githubusercontent.com/96409909/219075307-b07cec6c-993a-410e-8575-252272a2fe63.png">
 
 ## 요구사항
 
